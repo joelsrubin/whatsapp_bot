@@ -1,12 +1,8 @@
-import WAWebJS, {
-  LocalAuth,
-  GroupNotification,
-  GroupChat,
-} from 'whatsapp-web.js';
+import { LocalAuth, GroupChat } from 'whatsapp-web.js';
 import { formatOrdinals } from './helpers';
 
 import { writeFile, readFile } from 'node:fs/promises';
-import * as dotenv from 'dotenv'; // see https://github.com/motdotla/dotenv#how-do-i-use-dotenv-with-import
+import * as dotenv from 'dotenv';
 import { Client } from 'whatsapp-web.js';
 
 dotenv.config();
@@ -22,45 +18,18 @@ client.on('ready', () => {
   console.log('Client is ready!');
 });
 
-type TMention = {
-  pushname: string;
-};
-
-const msgsWithReactions: {
-  [key: string]: number;
-} = {};
-
-// client.on('message_reaction', async (rx) => {
-//   const { msgId, id } = rx;
-//   const idxId = String(msgId._serialized);
-//   if (msgsWithReactions[idxId]) {
-//     console.log('msgsWithReactions[idxId]', msgsWithReactions[idxId]);
-//     msgsWithReactions[idxId] = msgsWithReactions[idxId] + 1;
-//   } else {
-//     console.log("reaction doesn't exist");
-//     msgsWithReactions[idxId] = 1;
-//   }
-
-//   if (msgsWithReactions[idxId] === 3) {
-//     const chats = await client.getChats();
-//     console.log(chats);
-//     const chat = chats.find((c) => c.id._serialized === id._serialized);
-//     console.log(chat);
-//     chat && client.sendMessage(chat?.id._serialized, '3 reactions, nice!');
-//   }
-// });
-// function addMinutes(date: Date, minutes: number) {
-//   return new Date(date.getTime() + minutes * 60000);
-// }
-// client.on('message', async (msg) => {
-//   if (msg.body === '!muting') {
-//     msg.react('🤫');
-//     msg.reply('Muting for 1 hour');
-//     await client.muteChat(msg.from);
-//   }
-// });
-
+console.log(process.env.API_KEY);
 // weather
+
+client.on('message', async (msg) => {
+  if (msg.body.includes("And that's ok!")) {
+    const chat = await msg.getChat();
+    if (chat.name === 'Hunkomania') {
+      chat.sendMessage('🤖 is it, sis?');
+    }
+  }
+});
+
 client.on('message', async (msg) => {
   if (msg.body === '!weather') {
     const weather = await fetch(
@@ -82,6 +51,31 @@ client.on('message', async (msg) => {
   }
 });
 
+// movies
+client.on('message', async (msg) => {
+  const chat = await msg.getChat();
+  if (msg.body.includes('!movies')) {
+    // function to get random year between 1970 and 2022
+    function getRandomYear() {
+      return Math.floor(Math.random() * (2022 - 1950 + 1) + 1951);
+    }
+    const randomYear = getRandomYear();
+    const randomPage = Math.floor(Math.random() * 100 + 1);
+    const movies = await fetch(
+      `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.MOVIE_KEY}&language=en-US&sort_by=popularity.inc&include_adult=false&include_video=false&page=${randomPage}&with_genres=27&release_date.gte=${randomYear}-01-01`
+    );
+    const moviesJson = await movies.json();
+    const randomMovie =
+      moviesJson.results[Math.floor(Math.random() * moviesJson.results.length)];
+    const date = randomMovie.release_date;
+    const [year, month, day] = date.split('-');
+
+    const result = [month, day, year].join('/');
+    chat.sendMessage(
+      `🤖 How about ${randomMovie.original_title}? It has an average rating of ${randomMovie.vote_average} and was released ${result}`
+    );
+  }
+});
 // pickle ball
 client.on('message', async (msg) => {
   console.log('MESSAGE RECEIVED', msg.body);
@@ -96,6 +90,8 @@ client.on('message', async (msg) => {
         .join(', ')}`
     );
   }
+
+  // pants alert
   if (msg.body.includes('!pants')) {
     msg.react('👖');
 
@@ -149,22 +145,24 @@ client.on('message', async (msg) => {
 
   // JOD
   if (msg.body.includes('!jod')) {
+    const chat = await msg.getChat();
     const mentions = await msg.getMentions();
     if (msg.body.includes('add')) {
       for (let contact of mentions) {
-        msg.reply(`🤖 @${contact.pushname} has made a Joke of the Day!`);
+        chat.sendMessage(`🤖 @${contact.id.user} has made a Joke of the Day!`, {
+          mentions: [contact],
+        });
         // create a json file with the name of the person and increment the count
         const data = await readFile('jokes.json', 'utf8');
 
         const obj = JSON.parse(data);
 
-        console.log({ obj });
         if (obj[contact.pushname] === undefined) {
           obj[contact.pushname] = 1;
         } else {
           obj[contact.pushname] = obj[contact.pushname] + 1;
         }
-        console.log('added to obj!', obj);
+
         const json = JSON.stringify(obj); //convert it back to json
         await writeFile('jokes.json', json, 'utf8');
       }
@@ -173,12 +171,16 @@ client.on('message', async (msg) => {
         console.log(`${contact.pushname} was mentioned`);
         const data = await readFile('jokes.json', 'utf8');
         const obj = JSON.parse(data);
-        console.log({ obj });
+
         if (obj[contact.pushname] !== undefined) {
           const num = obj[contact.pushname];
-          msg.reply(`🤖 @${contact.pushname} has ${num} JODs`);
+          chat.sendMessage(`🤖 @${contact.id.user} has ${num} JODs`, {
+            mentions: [contact],
+          });
         } else {
-          msg.reply(`🤖 @${contact.pushname} has 0 JODs. Sad in a way`);
+          chat.sendMessage(`🤖 @${contact.id.user} has 0 JODs. Sad in a way`, {
+            mentions: [contact],
+          });
         }
       }
     }
