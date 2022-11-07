@@ -84,6 +84,12 @@ client.on('message', async (msg) => {
     }
   }
 });
+
+client.on('message', async (msg) => {
+  if (msg.body.includes('!goodnight')) {
+    msg.reply('🤖 Goodnight, sweet dreams!');
+  }
+});
 // pickle ball
 client.on('message', async (msg) => {
   console.log('MESSAGE RECEIVED', msg.body);
