@@ -54,7 +54,9 @@ client.on('message', async (msg) => {
 // movies
 client.on('message', async (msg) => {
   const chat = await msg.getChat();
+
   if (msg.body.includes('!movies')) {
+    msg.react('🍿');
     // function to get random year between 1970 and 2022
     function getRandomYear() {
       return Math.floor(Math.random() * (2022 - 1950 + 1) + 1951);
@@ -71,9 +73,15 @@ client.on('message', async (msg) => {
     const [year, month, day] = date.split('-');
 
     const result = [month, day, year].join('/');
-    chat.sendMessage(
-      `🤖 How about ${randomMovie.original_title}? It has an average rating of ${randomMovie.vote_average} and was released ${result}`
-    );
+    if (randomMovie.vote_average < 3) {
+      chat.sendMessage(
+        `🤖 ${randomMovie.title} came out on ${result} and has a rating of ${randomMovie.vote_average}. I don't recommend it.`
+      );
+    } else {
+      chat.sendMessage(
+        `🤖 How about ${randomMovie.original_title}? It has an average rating of ${randomMovie.vote_average} and was released ${result}`
+      );
+    }
   }
 });
 // pickle ball
