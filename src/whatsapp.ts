@@ -4,7 +4,7 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 
 const { Client } = require('whatsapp-web.js');
-
+let count = 0;
 export const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
@@ -33,6 +33,10 @@ type TMsg = {
 
 client.on('message', async (msg: TMsg) => {
   console.log('MESSAGE RECEIVED', msg.body);
+  if (msg.body.includes('!rob')) {
+    count += 1;
+    msg.reply('good morning rob 🤖. you have said hi ' + count + ' times');
+  }
   if (msg.fromMe) {
     console.log("I'm the sender");
   }
