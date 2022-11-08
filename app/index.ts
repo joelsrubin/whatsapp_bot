@@ -13,5 +13,5 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 server.listen(3000, () => {
-  console.log('listening on *:3000');
+  console.log('listening on http//localhost:3000');
 });

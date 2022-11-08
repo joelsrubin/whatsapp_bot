@@ -1,17 +1,20 @@
-import { LocalAuth, GroupChat, RemoteAuth } from 'whatsapp-web.js';
+import { LocalAuth, GroupChat } from 'whatsapp-web.js';
 import { formatOrdinals } from './helpers';
 
 import { writeFile, readFile } from 'node:fs/promises';
+
 import * as dotenv from 'dotenv';
 import { Client } from 'whatsapp-web.js';
 const qrcode = require('qrcode-terminal');
 
 dotenv.config();
+
 let count = 0;
+
 export const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: ['--no-sandbox'],
   },
 });
 
@@ -82,6 +85,35 @@ const goodReviews = [
   'Definite Tuffies Contender',
 ];
 
+client.on('message', async (msg) => {
+  const chat = await msg.getChat();
+  if (msg.body.includes('!product')) {
+    msg.react('🚀');
+    const data = await fetch('https://api.producthunt.com/v1/posts', {
+      headers: {
+        Authorization: `Bearer ${process.env.PRODUCT_HUNT_KEY}`,
+      },
+    });
+    const dataJson = await data.json();
+    const products = dataJson.posts;
+    // map over products and return the top ten by votes_count
+    const topTen = products
+      .sort((a: any, b: any) => b.votes_count - a.votes_count)
+      .slice(0, 10)
+      .map(
+        (product: any, idx: number) =>
+          `${idx + 1}. ${product.name} - ${product.tagline} - ${
+            product.votes_count
+          } votes`
+      )
+      .join('\n');
+
+    chat.sendMessage(
+      `🤖 Here are the top ten products on Product Hunt today: \n\n${topTen}`
+    );
+  }
+});
+
 // movies
 client.on('message', async (msg) => {
   const chat = await msg.getChat();
@@ -145,7 +177,7 @@ client.on('message', async (msg) => {
   console.log('MESSAGE RECEIVED', msg.body);
   if (msg.body.includes('!pickle')) {
     msg.react('🏓');
-    const scores = await readFile('scores.json', 'utf-8');
+    const scores = await readFile('./data/scores.json', 'utf-8');
     const parsedScores = await JSON.parse(scores);
     const entries = Object.entries(parsedScores);
     msg.reply(
@@ -161,7 +193,7 @@ client.on('message', async (msg) => {
 
     const { author } = msg;
 
-    const data = await readFile('pants.json', 'utf8');
+    const data = await readFile('./data/pants.json', 'utf8');
     const obj = JSON.parse(data);
 
     console.log({ obj });
@@ -183,7 +215,7 @@ client.on('message', async (msg) => {
     }
 
     const json = JSON.stringify(obj); //convert it back to json
-    await writeFile('pants.json', json, 'utf8');
+    await writeFile('./data/pants.json', json, 'utf8');
 
     console.log('complete');
 
@@ -217,7 +249,7 @@ client.on('message', async (msg) => {
           mentions: [contact],
         });
         // create a json file with the name of the person and increment the count
-        const data = await readFile('jokes.json', 'utf8');
+        const data = await readFile('./data/jokes.json', 'utf8');
 
         const obj = JSON.parse(data);
 
@@ -228,12 +260,12 @@ client.on('message', async (msg) => {
         }
 
         const json = JSON.stringify(obj); //convert it back to json
-        await writeFile('jokes.json', json, 'utf8');
+        await writeFile('./data/jokes.json', json, 'utf8');
       }
     } else {
       for (let contact of mentions) {
         console.log(`${contact.pushname} was mentioned`);
-        const data = await readFile('jokes.json', 'utf8');
+        const data = await readFile('./data/jokes.json', 'utf8');
         const obj = JSON.parse(data);
 
         if (obj[contact.pushname] !== undefined) {
