@@ -1,4 +1,4 @@
-# fly.toml file generated for whats-bot on 2022-11-07T17:51:32-06:00
+# fly.toml file generated for whats-bot on 2022-11-08T16:16:56-06:00
 
 app = "whats-bot"
 kill_signal = "SIGINT"
@@ -6,9 +6,10 @@ kill_timeout = 5
 processes = []
 
 [env]
-  PORT = "8080"
   API_KEY = "54204836d150c3e07f9c668be1a69246"
   MOVIE_KEY = "57f535f358393665753c938201a145cb"
+  PRODUCT_HUNT_KEY = "A2lYZ1AphkfVNkGoGApZEZ2SG5vYnmTkDHMPo8uGaiI"
+  PORT = "8080"
 
 [experimental]
   allowed_public_ports = []

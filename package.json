@@ -17,8 +17,6 @@
     "eslint-plugin-import": "^2.25.2",
     "eslint-plugin-n": "^15.0.0",
     "eslint-plugin-promise": "^6.0.0",
-    "i": "^0.3.7",
-    "npm": "^8.19.3",
     "typescript": "*"
   },
   "dependencies": {
