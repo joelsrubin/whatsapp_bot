@@ -9,6 +9,6 @@
     "noImplicitAny": true,
     "outDir": "dist"
   },
-  "include": ["src/**/*"],
+  "include": ["app/**/*"],
   "lib": ["es2015"]
 }

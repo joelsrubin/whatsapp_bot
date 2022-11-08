@@ -1,9 +1,10 @@
-import { LocalAuth, GroupChat } from 'whatsapp-web.js';
+import { LocalAuth, GroupChat, RemoteAuth } from 'whatsapp-web.js';
 import { formatOrdinals } from './helpers';
 
 import { writeFile, readFile } from 'node:fs/promises';
 import * as dotenv from 'dotenv';
 import { Client } from 'whatsapp-web.js';
+const qrcode = require('qrcode-terminal');
 
 dotenv.config();
 let count = 0;
@@ -14,11 +15,14 @@ export const client = new Client({
   },
 });
 
+client.on('qr', (qr) => {
+  qrcode.generate(qr, { small: true });
+});
+
 client.on('ready', () => {
   console.log('Client is ready!');
 });
 
-console.log(process.env.API_KEY);
 // weather
 
 client.on('message', async (msg) => {
@@ -32,6 +36,8 @@ client.on('message', async (msg) => {
 
 client.on('message', async (msg) => {
   if (msg.body === '!weather') {
+    const chat = await msg.getChat();
+    msg.react('🌞');
     const weather = await fetch(
       `https://api.openweathermap.org/data/2.5/weather?lat=40.7128&lon=-74.0060&appid=${process.env.API_KEY}`
     );
@@ -41,15 +47,40 @@ client.on('message', async (msg) => {
     function convertKelvinToFahrenheit(kelvin: number) {
       return Math.round((kelvin - 273.15) * 1.8 + 32);
     }
-    msg.reply(
+    chat.sendMessage(
       `🤖 The weather in New York is ${convertKelvinToFahrenheit(
         weatherJson.main.feels_like
       )} degrees and ${weatherJson.weather[0].main}`
     );
-
-    msg.react('🌞');
   }
 });
+
+// bad movie reviews
+const badReviews = [
+  'Yikes. Not exactly the Godfather 😂',
+  "I don't recommend it.",
+  "I wouldn't go there if I were you.",
+  'I would not recommend this movie.',
+];
+
+// average movie reviews
+const averageReviews = [
+  'It sounds ok.',
+  'It sounds alright.',
+  'It sounds good.',
+  '...ok.',
+];
+
+// good movie reviews
+const goodReviews = [
+  'This sounds like a winner!',
+  'I love this movie!',
+  'I would watch this!',
+  'I would recommend this movie.',
+  'I would watch this movie again.',
+  'I would watch this movie again and again.',
+  'Definite Tuffies Contender',
+];
 
 // movies
 client.on('message', async (msg) => {
@@ -75,11 +106,30 @@ client.on('message', async (msg) => {
     const result = [month, day, year].join('/');
     if (randomMovie.vote_average < 3) {
       chat.sendMessage(
-        `🤖 ${randomMovie.title} came out on ${result} and has a rating of ${randomMovie.vote_average}. I don't recommend it.`
+        `🤖 ${
+          randomMovie.original_title
+        } came out on ${result} and has a rating of ${
+          randomMovie.vote_average
+        }. ${badReviews[Math.floor(Math.random() * badReviews.length)]}`
+      );
+    } else if (randomMovie.vote_average > 7) {
+      console.log('movie is good');
+      chat.sendMessage(
+        `🤖 ${
+          randomMovie.original_title
+        } came out on ${result} and has a rating of ${
+          randomMovie.vote_average
+        }. ${goodReviews[Math.floor(Math.random() * goodReviews.length)]}`
       );
     } else {
       chat.sendMessage(
-        `🤖 How about ${randomMovie.original_title}? It has an average rating of ${randomMovie.vote_average} and was released ${result}`
+        `🤖 How about ${
+          randomMovie.original_title
+        }? It has an average rating of ${
+          randomMovie.vote_average
+        } and was released ${result}. ${
+          averageReviews[Math.floor(Math.random() * averageReviews.length)]
+        }`
       );
     }
   }

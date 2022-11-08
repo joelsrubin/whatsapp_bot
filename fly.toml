@@ -1,0 +1,41 @@
+# fly.toml file generated for whats-bot on 2022-11-07T17:51:32-06:00
+
+app = "whats-bot"
+kill_signal = "SIGINT"
+kill_timeout = 5
+processes = []
+
+[env]
+  PORT = "8080"
+  API_KEY = "54204836d150c3e07f9c668be1a69246"
+  MOVIE_KEY = "57f535f358393665753c938201a145cb"
+
+[experimental]
+  allowed_public_ports = []
+  auto_rollback = true
+
+[[services]]
+  http_checks = []
+  internal_port = 8080
+  processes = ["app"]
+  protocol = "tcp"
+  script_checks = []
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+    type = "connections"
+
+  [[services.ports]]
+    force_https = true
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.tcp_checks]]
+    grace_period = "1s"
+    interval = "15s"
+    restart_limit = 0
+    timeout = "2s"

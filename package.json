@@ -4,8 +4,9 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "start": "tsc && node dist/index.js",
-    "lint": "eslint . --ext .ts"
+    "start:dev": "tsc && node dist/index.js",
+    "lint": "eslint . --ext .ts",
+    "start": "node dist/index.js"
   },
   "devDependencies": {
     "@types/express": "^4.17.14",
