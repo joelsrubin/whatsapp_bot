@@ -1,10 +1,11 @@
-import { LocalAuth, GroupChat } from 'whatsapp-web.js';
+import { LocalAuth, GroupChat, NoAuth, MessageMedia } from 'whatsapp-web.js';
 import { formatOrdinals } from './helpers';
 
 import { writeFile, readFile } from 'node:fs/promises';
 
 import * as dotenv from 'dotenv';
 import { Client } from 'whatsapp-web.js';
+import { getGif, getMovie, getProduct, getWeather } from './services';
 const qrcode = require('qrcode-terminal');
 
 dotenv.config();
@@ -12,7 +13,7 @@ dotenv.config();
 let count = 0;
 
 export const client = new Client({
-  authStrategy: new LocalAuth(),
+  authStrategy: new LocalAuth({ clientId: 'one', dataPath: './auth' }),
   puppeteer: {
     args: ['--no-sandbox'],
   },
@@ -39,22 +40,37 @@ client.on('message', async (msg) => {
 });
 
 client.on('message', async (msg) => {
+  if (msg.body.includes('!kramer')) {
+    const chat = await msg.getChat();
+    const gif = await getGif();
+    const media = await MessageMedia.fromUrl(gif);
+    chat.sendMessage(media);
+  }
+});
+
+client.on('message', async (msg) => {
+  if (msg.body.includes('!gif')) {
+    msg.react('📽');
+    const query = msg.body.split('!gif')[1];
+    console.log({ query });
+    const chat = await msg.getChat();
+    try {
+      const gif = await getGif(query);
+      const media = await MessageMedia.fromUrl(gif);
+      chat.sendMessage(media);
+    } catch {
+      msg.reply('🤖 I could not find a gif for that');
+    }
+  }
+});
+
+client.on('message', async (msg) => {
   if (msg.body === '!weather') {
     const chat = await msg.getChat();
     msg.react('🌞');
-    const weather = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=40.7128&lon=-74.0060&appid=${process.env.API_KEY}`
-    );
-    const weatherJson = await weather.json();
-
-    //function convertin kelvin to fahrenheit
-    function convertKelvinToFahrenheit(kelvin: number) {
-      return Math.round((kelvin - 273.15) * 1.8 + 32);
-    }
+    const { temp, condition } = await getWeather();
     chat.sendMessage(
-      `🤖 The weather in New York is ${convertKelvinToFahrenheit(
-        weatherJson.main.feels_like
-      )} degrees and ${weatherJson.weather[0].main}`
+      `🤖 The weather in New York is ${temp} degrees and ${condition}`
     );
   }
 });
@@ -90,24 +106,7 @@ client.on('message', async (msg) => {
   const chat = await msg.getChat();
   if (msg.body.includes('!product')) {
     msg.react('🚀');
-    const data = await fetch('https://api.producthunt.com/v1/posts', {
-      headers: {
-        Authorization: `Bearer ${process.env.PRODUCT_HUNT_KEY}`,
-      },
-    });
-    const dataJson = await data.json();
-    const products = dataJson.posts;
-    // map over products and return the top ten by votes_count
-    const topTen = products
-      .sort((a: any, b: any) => b.votes_count - a.votes_count)
-      .slice(0, 10)
-      .map(
-        (product: any, idx: number) =>
-          `${idx + 1}. ${product.name} - ${product.tagline} - ${
-            product.votes_count
-          } votes`
-      )
-      .join('\n');
+    const topTen = await getProduct();
 
     chat.sendMessage(
       `🤖 Here are the top ten products on Product Hunt today: \n\n${topTen}`
@@ -118,49 +117,25 @@ client.on('message', async (msg) => {
 // movies
 client.on('message', async (msg) => {
   const chat = await msg.getChat();
-
   if (msg.body.includes('!movies')) {
     msg.react('🍿');
-    // function to get random year between 1970 and 2022
-    function getRandomYear() {
-      return Math.floor(Math.random() * (2022 - 1950 + 1) + 1951);
-    }
-    const randomYear = getRandomYear();
-    const randomPage = Math.floor(Math.random() * 100 + 1);
-    const movies = await fetch(
-      `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.MOVIE_KEY}&language=en-US&sort_by=popularity.inc&include_adult=false&include_video=false&page=${randomPage}&with_genres=27&release_date.gte=${randomYear}-01-01`
-    );
-    const moviesJson = await movies.json();
-    const randomMovie =
-      moviesJson.results[Math.floor(Math.random() * moviesJson.results.length)];
-    const date = randomMovie.release_date;
-    const [year, month, day] = date.split('-');
-
-    const result = [month, day, year].join('/');
-    if (randomMovie.vote_average < 3) {
+    const { title, releaseDate, reviews } = await getMovie();
+    if (reviews < 3) {
       chat.sendMessage(
-        `🤖 ${
-          randomMovie.original_title
-        } came out on ${result} and has a rating of ${
-          randomMovie.vote_average
-        }. ${badReviews[Math.floor(Math.random() * badReviews.length)]}`
+        `🤖 ${title} came out on ${releaseDate} and has a rating of ${reviews}. ${
+          badReviews[Math.floor(Math.random() * badReviews.length)]
+        }`
       );
-    } else if (randomMovie.vote_average > 7) {
+    } else if (reviews > 7) {
       console.log('movie is good');
       chat.sendMessage(
-        `🤖 ${
-          randomMovie.original_title
-        } came out on ${result} and has a rating of ${
-          randomMovie.vote_average
-        }. ${goodReviews[Math.floor(Math.random() * goodReviews.length)]}`
+        `🤖 ${title} came out on ${releaseDate} and has a rating of ${reviews}. ${
+          goodReviews[Math.floor(Math.random() * goodReviews.length)]
+        }`
       );
     } else {
       chat.sendMessage(
-        `🤖 How about ${
-          randomMovie.original_title
-        }? It has an average rating of ${
-          randomMovie.vote_average
-        } and was released ${result}. ${
+        `🤖 How about ${title}? It has an average rating of ${reviews} and was released ${releaseDate}. ${
           averageReviews[Math.floor(Math.random() * averageReviews.length)]
         }`
       );
@@ -221,17 +196,19 @@ client.on('message', async (msg) => {
     console.log('complete');
 
     const curChat = (await msg.getChat()) as GroupChat;
-    const { participants } = curChat;
-    let mentions = [];
-    let text = '🤖 Pants Alert 🚨! ';
-    for (let participant of participants) {
-      const contact = await client.getContactById(participant.id._serialized);
+    if (curChat.isGroup) {
+      const { participants } = curChat;
+      let mentions = [];
+      let text = '🤖 Pants Alert 🚨! ';
+      for (let participant of participants) {
+        const contact = await client.getContactById(participant.id._serialized);
 
-      mentions.push(contact);
-      text += `@${participant.id.user} `;
+        mentions.push(contact);
+        text += `@${participant.id.user} `;
+      }
+
+      await curChat.sendMessage(text, { mentions });
     }
-
-    await curChat.sendMessage(text, { mentions });
   }
 
   // Rob-ot
