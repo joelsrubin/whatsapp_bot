@@ -2,7 +2,7 @@ import { LocalAuth, GroupChat, NoAuth, MessageMedia } from 'whatsapp-web.js';
 import { formatOrdinals } from './helpers';
 
 import { writeFile, readFile } from 'node:fs/promises';
-
+import { PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
 import { Client } from 'whatsapp-web.js';
 import { getGif, getMovie, getProduct, getWeather } from './services';
@@ -11,6 +11,7 @@ const qrcode = require('qrcode-terminal');
 dotenv.config();
 
 let count = 0;
+const prisma = new PrismaClient();
 
 export const client = new Client({
   authStrategy: new LocalAuth({ clientId: 'one', dataPath: './auth' }),
@@ -169,31 +170,40 @@ client.on('message', async (msg) => {
 
     const { author } = msg;
 
-    const data = await readFile('./data/pants.json', 'utf8');
-    const obj = JSON.parse(data);
-
-    console.log({ obj });
     if (author) {
-      const { name } = await client.getContactById(author);
-      if (name) {
-        if (obj[name] === undefined) {
-          obj[name] = 1;
-        } else {
-          obj[name] = obj[name] + 1;
-        }
-        console.log('added to obj!', obj);
+      // find user in db and update pantsAlert
+      const user = await prisma.user.findFirst({
+        where: {
+          name: author,
+        },
+      });
+      let pantsCount = Number(user?.pantsAlert);
+      if (!user) {
+        await prisma.user.create({
+          data: {
+            name: author,
+            pantsAlert: 1,
+          },
+        });
+      } else {
+        await prisma.user.update({
+          where: {
+            id: user.id,
+          },
+          data: {
+            pantsAlert: (pantsCount += 1),
+          },
+        });
+
         setTimeout(() => {
           msg.reply(
-            `🤖 This is ${name}'s ${formatOrdinals(obj[name])} pants alert!`
+            `🤖 This is ${user.name}'s ${formatOrdinals(
+              pantsCount
+            )} pants alert!`
           );
         }, 1000);
       }
     }
-
-    const json = JSON.stringify(obj); //convert it back to json
-    await writeFile('./data/pants.json', json, 'utf8');
-
-    console.log('complete');
 
     const curChat = (await msg.getChat()) as GroupChat;
     if (curChat.isGroup) {
@@ -227,28 +237,50 @@ client.on('message', async (msg) => {
           mentions: [contact],
         });
         // create a json file with the name of the person and increment the count
-        const data = await readFile('./data/jokes.json', 'utf8');
-
-        const obj = JSON.parse(data);
-
-        if (obj[contact.pushname] === undefined) {
-          obj[contact.pushname] = 1;
+        const user = await prisma.user.findFirst({
+          where: {
+            name: contact.id.user,
+          },
+        });
+        let jodCount = Number(user?.jods);
+        if (!user) {
+          await prisma.user.create({
+            data: {
+              name: contact.id.user,
+              jods: 1,
+            },
+          });
         } else {
-          obj[contact.pushname] = obj[contact.pushname] + 1;
+          await prisma.user.update({
+            where: {
+              id: user.id,
+            },
+            data: {
+              jods: (jodCount += 1),
+            },
+          });
         }
-
-        const json = JSON.stringify(obj); //convert it back to json
-        await writeFile('./data/jokes.json', json, 'utf8');
       }
     } else {
       for (let contact of mentions) {
         console.log(`${contact.pushname} was mentioned`);
-        const data = await readFile('./data/jokes.json', 'utf8');
-        const obj = JSON.parse(data);
+        const user = await prisma.user.findFirst({
+          where: {
+            name: contact.id.user,
+          },
+        });
+        let jodCount = Number(user?.jods);
+        if (!user) {
+          await prisma.user.create({
+            data: {
+              name: contact.id.user,
+              jods: 0,
+            },
+          });
+        }
 
-        if (obj[contact.pushname] !== undefined) {
-          const num = obj[contact.pushname];
-          chat.sendMessage(`🤖 @${contact.id.user} has ${num} JODs`, {
+        if (jodCount) {
+          chat.sendMessage(`🤖 @${contact.id.user} has ${jodCount} JODs`, {
             mentions: [contact],
           });
         } else {
