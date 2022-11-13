@@ -1,20 +1,28 @@
 import { LocalAuth, GroupChat, NoAuth, MessageMedia } from 'whatsapp-web.js';
 import { formatOrdinals } from './helpers';
 
-import { writeFile, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
 import { Client } from 'whatsapp-web.js';
-import { getGif, getMovie, getProduct, getWeather } from './services';
+import {
+  fetchLineup,
+  getGif,
+  getMovie,
+  getProduct,
+  getWeather,
+} from './services';
+
 const qrcode = require('qrcode-terminal');
 
 dotenv.config();
 
 let count = 0;
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient();
 
 export const client = new Client({
-  authStrategy: new LocalAuth({ clientId: 'one', dataPath: './auth' }),
+  authStrategy: new LocalAuth(),
+  authTimeoutMs: 900000,
   puppeteer: {
     args: ['--no-sandbox'],
   },
@@ -29,7 +37,17 @@ client.on('ready', () => {
   console.log('Client is ready!');
 });
 
-// weather
+client.on('message', async (msg) => {
+  if (msg.body.includes('!beach')) {
+    const chat = await msg.getChat();
+    const lineup = await fetchLineup();
+    if (!lineup) {
+      chat.sendMessage('🤖 No lineup yet');
+    } else {
+      chat.sendMessage(`🤖 The lineup for today is: ${lineup}`);
+    }
+  }
+});
 
 client.on('message', async (msg) => {
   if (msg.body.includes("And that's ok!")) {
@@ -65,6 +83,7 @@ client.on('message', async (msg) => {
   }
 });
 
+// weather
 client.on('message', async (msg) => {
   if (msg.body === '!weather') {
     const chat = await msg.getChat();
@@ -164,131 +183,131 @@ client.on('message', async (msg) => {
     );
   }
 
-  // pants alert
-  if (msg.body.includes('!pants')) {
-    msg.react('👖');
+  // // pants alert
+  // if (msg.body.includes('!pants')) {
+  //   msg.react('👖');
 
-    const { author } = msg;
+  //   const { author } = msg;
 
-    if (author) {
-      // find user in db and update pantsAlert
-      const user = await prisma.user.findFirst({
-        where: {
-          name: author,
-        },
-      });
-      let pantsCount = Number(user?.pantsAlert);
-      if (!user) {
-        await prisma.user.create({
-          data: {
-            name: author,
-            pantsAlert: 1,
-          },
-        });
-      } else {
-        await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            pantsAlert: (pantsCount += 1),
-          },
-        });
+  //   if (author) {
+  //     // find user in db and update pantsAlert
+  //     const user = await prisma.user.findFirst({
+  //       where: {
+  //         name: author,
+  //       },
+  //     });
+  //     let pantsCount = Number(user?.pantsAlert);
+  //     if (!user) {
+  //       await prisma.user.create({
+  //         data: {
+  //           name: author,
+  //           pantsAlert: 1,
+  //         },
+  //       });
+  //     } else {
+  //       await prisma.user.update({
+  //         where: {
+  //           id: user.id,
+  //         },
+  //         data: {
+  //           pantsAlert: (pantsCount += 1),
+  //         },
+  //       });
 
-        setTimeout(() => {
-          msg.reply(
-            `🤖 This is ${user.name}'s ${formatOrdinals(
-              pantsCount
-            )} pants alert!`
-          );
-        }, 1000);
-      }
-    }
+  //       setTimeout(() => {
+  //         msg.reply(
+  //           `🤖 This is ${user.name}'s ${formatOrdinals(
+  //             pantsCount
+  //           )} pants alert!`
+  //         );
+  //       }, 1000);
+  //     }
+  //   }
 
-    const curChat = (await msg.getChat()) as GroupChat;
-    if (curChat.isGroup) {
-      const { participants } = curChat;
-      let mentions = [];
-      let text = '🤖 Pants Alert 🚨! ';
-      for (let participant of participants) {
-        const contact = await client.getContactById(participant.id._serialized);
+  //   const curChat = (await msg.getChat()) as GroupChat;
+  //   if (curChat.isGroup) {
+  //     const { participants } = curChat;
+  //     let mentions = [];
+  //     let text = '🤖 Pants Alert 🚨! ';
+  //     for (let participant of participants) {
+  //       const contact = await client.getContactById(participant.id._serialized);
 
-        mentions.push(contact);
-        text += `@${participant.id.user} `;
-      }
+  //       mentions.push(contact);
+  //       text += `@${participant.id.user} `;
+  //     }
 
-      await curChat.sendMessage(text, { mentions });
-    }
-  }
+  //     await curChat.sendMessage(text, { mentions });
+  //   }
+  // }
 
-  // Rob-ot
-  if (msg.body.includes('!rob')) {
-    count += 1;
-    msg.reply('good morning rob 🤖. you have said hi ' + count + ' times');
-  }
+  // // Rob-ot
+  // if (msg.body.includes('!rob')) {
+  //   count += 1;
+  //   msg.reply('good morning rob 🤖. you have said hi ' + count + ' times');
+  // }
 
-  // JOD
-  if (msg.body.includes('!jod')) {
-    const chat = await msg.getChat();
-    const mentions = await msg.getMentions();
-    if (msg.body.includes('add')) {
-      for (let contact of mentions) {
-        chat.sendMessage(`🤖 @${contact.id.user} has made a Joke of the Day!`, {
-          mentions: [contact],
-        });
-        // create a json file with the name of the person and increment the count
-        const user = await prisma.user.findFirst({
-          where: {
-            name: contact.id.user,
-          },
-        });
-        let jodCount = Number(user?.jods);
-        if (!user) {
-          await prisma.user.create({
-            data: {
-              name: contact.id.user,
-              jods: 1,
-            },
-          });
-        } else {
-          await prisma.user.update({
-            where: {
-              id: user.id,
-            },
-            data: {
-              jods: (jodCount += 1),
-            },
-          });
-        }
-      }
-    } else {
-      for (let contact of mentions) {
-        console.log(`${contact.pushname} was mentioned`);
-        const user = await prisma.user.findFirst({
-          where: {
-            name: contact.id.user,
-          },
-        });
-        let jodCount = Number(user?.jods);
-        if (!user) {
-          await prisma.user.create({
-            data: {
-              name: contact.id.user,
-              jods: 0,
-            },
-          });
-        }
+  // // JOD
+  // if (msg.body.includes('!jod')) {
+  //   const chat = await msg.getChat();
+  //   const mentions = await msg.getMentions();
+  //   if (msg.body.includes('add')) {
+  //     for (let contact of mentions) {
+  //       chat.sendMessage(`🤖 @${contact.id.user} has made a Joke of the Day!`, {
+  //         mentions: [contact],
+  //       });
+  //       // create a json file with the name of the person and increment the count
+  //       const user = await prisma.user.findFirst({
+  //         where: {
+  //           name: contact.id.user,
+  //         },
+  //       });
+  //       let jodCount = Number(user?.jods);
+  //       if (!user) {
+  //         await prisma.user.create({
+  //           data: {
+  //             name: contact.id.user,
+  //             jods: 1,
+  //           },
+  //         });
+  //       } else {
+  //         await prisma.user.update({
+  //           where: {
+  //             id: user.id,
+  //           },
+  //           data: {
+  //             jods: (jodCount += 1),
+  //           },
+  //         });
+  //       }
+  //     }
+  //   } else {
+  //     for (let contact of mentions) {
+  //       console.log(`${contact.pushname} was mentioned`);
+  //       const user = await prisma.user.findFirst({
+  //         where: {
+  //           name: contact.id.user,
+  //         },
+  //       });
+  //       let jodCount = Number(user?.jods);
+  //       if (!user) {
+  //         await prisma.user.create({
+  //           data: {
+  //             name: contact.id.user,
+  //             jods: 0,
+  //           },
+  //         });
+  //       }
 
-        if (jodCount) {
-          chat.sendMessage(`🤖 @${contact.id.user} has ${jodCount} JODs`, {
-            mentions: [contact],
-          });
-        } else {
-          chat.sendMessage(`🤖 @${contact.id.user} has 0 JODs. Sad in a way`, {
-            mentions: [contact],
-          });
-        }
-      }
-    }
-  }
+  //       if (jodCount) {
+  //         chat.sendMessage(`🤖 @${contact.id.user} has ${jodCount} JODs`, {
+  //           mentions: [contact],
+  //         });
+  //       } else {
+  //         chat.sendMessage(`🤖 @${contact.id.user} has 0 JODs. Sad in a way`, {
+  //           mentions: [contact],
+  //         });
+  //       }
+  //     }
+  //   }
+  // }
 });

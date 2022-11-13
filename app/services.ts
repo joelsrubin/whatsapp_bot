@@ -1,6 +1,21 @@
 import * as dotenv from 'dotenv';
+import { Window } from 'happy-dom';
 
 dotenv.config();
+
+export async function fetchLineup() {
+  const data = await fetch('https://www.beachgirlsbar.com/lineup.html');
+  const html = await data.text();
+  const { document } = new Window();
+  document.body.innerHTML = html;
+
+  const lineup = document.querySelectorAll('.paragraph')[2];
+  const lineupText = lineup.textContent;
+
+  const formatted = lineupText?.split(' ').join(',');
+
+  return formatted;
+}
 
 export async function getGif(query: string = 'kramer') {
   console.log({ query });
@@ -52,11 +67,7 @@ export async function getProduct() {
 }
 
 export async function getMovie() {
-  // function to get random year between 1970 and 2022
-  function getRandomYear() {
-    return Math.floor(Math.random() * (2022 - 1950 + 1) + 1951);
-  }
-  const randomYear = getRandomYear();
+  const randomYear = Math.floor(Math.random() * (2022 - 1950 + 1) + 1951);
   const randomPage = Math.floor(Math.random() * 100 + 1);
   const movies = await fetch(
     `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.MOVIE_KEY}&language=en-US&sort_by=popularity.inc&include_adult=false&include_video=false&page=${randomPage}&with_genres=27&release_date.gte=${randomYear}-01-01`
@@ -66,8 +77,8 @@ export async function getMovie() {
     moviesJson.results[Math.floor(Math.random() * moviesJson.results.length)];
   const date = randomMovie.release_date;
   const [year, month, day] = date.split('-');
-
   const result = [month, day, year].join('/');
+
   return {
     title: randomMovie.original_title,
     releaseDate: result,
